@@ -11,7 +11,7 @@ jobs:
   build:
     strategy:
       matrix:
-        os: [ubuntu-latest, macos-13, windows-latest]
+        os: [linux-latest, macos-13, windows-latest]
       fail-fast: false
     runs-on: ${{ matrix.os }}
     steps:
@@ -36,8 +36,8 @@ jobs:
         with:
           name: cached-localnet
           path: .localnet
-      - name: Install dependencies
-        if: ${{ matrix.os == 'ubuntu-latest' }}
+      - name: Install dependencies for Linux
+        if: ${{ matrix.os == 'linux-latest' }}
         run: |
           sudo apt update
           sudo apt install -y rpm
@@ -52,24 +52,27 @@ jobs:
           ./gradlew clean build --refresh-keys --refresh-dependencies
           ./gradlew packageInstallers
         working-directory: .
-      - name: Move Release Files on Unix
-        if: ${{ matrix.os == 'ubuntu-latest' || matrix.os == 'macos-13' }}
+      - name: Move Release Files on Linux
+        if: ${{ matrix.os == 'linux-latest' }}
         run: |
           mkdir ${{ github.workspace }}/release
-          if [ "${{ matrix.os }}" == "ubuntu-latest" ]; then
-            mv desktop/build/temp-*/binaries/haveno-*.rpm ${{ github.workspace }}/release
-            mv desktop/build/temp-*/binaries/haveno_*.deb ${{ github.workspace }}/release
-          else
-            mv desktop/build/temp-*/binaries/Haveno-*.dmg ${{ github.workspace }}/release
-          fi
-          mv desktop/build/temp-*/binaries/desktop-*.jar.SHA-256 ${{ github.workspace }}/release
+          zip -j ${{ github.workspace }}/release/haveno_x86_64_rpm-latest.zip desktop/build/temp-*/binaries/haveno-*.rpm
+          zip -j ${{ github.workspace }}/release/haveno_amd64_deb-latest.zip desktop/build/temp-*/binaries/haveno_*.deb
+          sha256sum desktop/build/temp-*/binaries/desktop-*.jar > ${{ github.workspace }}/release/desktop-latest.jar.SHA-256
+        shell: bash
+      - name: Move Release Files on macOS
+        if: ${{ matrix.os == 'macos-13' }}
+        run: |
+          mkdir ${{ github.workspace }}/release
+          mv desktop/build/temp-*/binaries/Haveno-*.dmg ${{ github.workspace }}/release
+          sha256sum desktop/build/temp-*/binaries/desktop-*.jar > ${{ github.workspace }}/release/desktop-latest.jar.SHA-256
         shell: bash
       - name: Move Release Files on Windows
         if: ${{ matrix.os == 'windows-latest' }}
         run: |
           mkdir ${{ github.workspace }}/release
           Move-Item -Path desktop\build\temp-*/binaries\Haveno-*.exe -Destination ${{ github.workspace }}/release
-          Move-Item -Path desktop\build\temp-*/binaries\desktop-*.jar.SHA-256 -Destination ${{ github.workspace }}/release
+          Get-FileHash -Algorithm SHA256 desktop\build\temp-*/binaries\desktop-*.jar | ForEach-Object { $_.Hash } > ${{ github.workspace }}/release/desktop-latest.jar.SHA-256
         shell: powershell
       - uses: actions/upload-artifact@v3
         with:
